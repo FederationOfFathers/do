@@ -10,5 +10,9 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+run
+do
+disk-cache
+
 # Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
 .glide/
