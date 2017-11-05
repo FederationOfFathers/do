@@ -30,7 +30,7 @@ var cdnPutKey = os.Getenv("CDN_PUT_KEY")
 
 func init() {
 	handlers[1]["checkGames"] = doCheckGames
-	crontab.AddFunc("@every 30s", cronwrap("queueFillGames", queueFillGames))
+	crontab.AddFunc("@every 120s", cronwrap("queueFillGames", queueFillGames))
 	crontab.AddFunc("@every 3600s", cronwrap("doPopulateMissingGamesMeta", doPopulateMissingGamesMeta))
 }
 
