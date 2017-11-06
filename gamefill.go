@@ -109,29 +109,32 @@ func doFillGame(title *xboxapi.TilehubTitle, platform int) error {
 	var gameImage string
 	row := getGameInfo.QueryRow(platform, title.TitleID)
 	if err := row.Scan(&gameID, &gameName, &gameImage); err != nil {
-		log.Debug("error scanning", zap.Error(err))
+		log.Error("error scanning", zap.Error(err))
 		return err
 	}
-	if gameImage == "" {
+	if gameImage == "" && title.DisplayImage != "" {
 		imageKey := fmt.Sprintf("game-image-%d", gameID)
 		putURL := fmt.Sprintf("http://dashboard.fofgaming.com/api/v0/cdn/%s", imageKey)
 		req, err := http.NewRequest("PUT", putURL, strings.NewReader(title.DisplayImage))
 		if err != nil {
-			log.Debug("error forming put request", zap.Error(err))
+			log.Error("error forming put request", zap.Error(err))
 			return err
 		}
 		req.Header.Set("Access-Key", cdnPutKey)
 		rsp, err := http.DefaultClient.Do(req)
+		if rsp != nil && rsp.Body != nil {
+			defer rsp.Body.Close()
+		}
 		if err != nil {
-			log.Debug("error fetching", zap.Error(err))
+			log.Error("error fetching", zap.Error(err))
 			return err
 		}
 		if rsp.StatusCode != 200 {
-			log.Debug("error fetching", zap.Int("statusCode", rsp.StatusCode), zap.String("status", rsp.Status))
+			log.Error("error fetching", zap.Int("statusCode", rsp.StatusCode), zap.String("status", rsp.Status))
 			return fmt.Errorf(rsp.Status)
 		}
 		if _, err := setGameInfo.Exec(imageKey, gameID); err != nil {
-			log.Debug("error updating", zap.Error(err))
+			log.Error("error updating", zap.Error(err))
 			return err
 		}
 		log.Debug(putURL)
@@ -152,7 +155,7 @@ func doCheckGames(job json.RawMessage) error {
 		return err
 	}
 	log = log.With(zap.String("member", user.Name), zap.String("xuid", user.XUID))
-	res, err := xbl.TileHub(user.XUID)
+	apiRes, err := xbl.TileHub(user.XUID)
 	if err != nil {
 		log.Error("Error checking TileHub", zap.String("username", user.Name), zap.String("xuid", user.XUID), zap.Error(err))
 		return err
@@ -161,7 +164,7 @@ func doCheckGames(job json.RawMessage) error {
 	var new = 0
 	var added = 0
 
-	for _, title := range res.Titles {
+	for _, title := range apiRes.Titles {
 		examined++
 		resolved, err := resolveConsole(title, log)
 		if err != nil {
@@ -190,11 +193,11 @@ func doCheckGames(job json.RawMessage) error {
 			log.Error("error creating game", zap.String("title", title.Name), zap.String("id", title.TitleID), zap.Error(err))
 			return err
 		}
-		if err := doFillGame(title, resolved); err != nil {
-			log.Error("error filling game info", zap.String("title", title.Name), zap.String("id", title.TitleID), zap.Error(err))
-		}
 		if id, err := res.LastInsertId(); err != nil && id > 0 {
 			new++
+		}
+		if err := doFillGame(title, resolved); err != nil {
+			log.Error("error filling game info", zap.String("title", title.Name), zap.String("id", title.TitleID), zap.Error(err))
 		}
 
 		res, err = ownGame.Exec(user.ID, resolved, title.TitleID, title.TitleHistory.LastTimePlayed.Time())
