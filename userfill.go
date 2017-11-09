@@ -62,6 +62,7 @@ func queueFillEmptyXUID(cronID int, name string) {
 		log.Debug("no users requiring xuid check")
 		return
 	}
+
 	if err := row.Scan(&data.ID, &data.XBL, &data.Name, &data.XUID, &data.LastCheck); err != nil {
 		if err == sql.ErrNoRows {
 			log.Debug("no users requiring xuid check")
