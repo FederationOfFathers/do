@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"time"
 )
 
@@ -9,8 +10,8 @@ func agoBytes(ago time.Duration) []byte {
 }
 
 func timeBytes(t time.Time) []byte {
-	b, _ := t.MarshalJSON()
-	return b
+	buf, _ := t.MarshalJSON()
+	return bytes.Replace(buf, []byte("\""), []byte(""), -1)
 }
 
 func agoTs(ago time.Duration) int64 {
@@ -19,5 +20,5 @@ func agoTs(ago time.Duration) int64 {
 
 func timeBuf() []byte {
 	buf, _ := time.Now().MarshalJSON()
-	return buf
+	return bytes.Replace(buf, []byte("\""), []byte(""), -1)
 }

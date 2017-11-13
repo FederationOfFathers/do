@@ -42,8 +42,9 @@ func initQueries() {
 
 	createGame = mustPrepare("INSERT IGNORE INTO games (platform,platform_id,name) VALUES(?,?,?)")
 	ownGame = mustPrepare(strings.Join([]string{
-		"REPLACE INTO membergames (member,game,played)",
-		"VALUES(?,(SELECT id FROM games WHERE platform = ? AND platform_id = ? LIMIT 1),?)",
+		"INSERT INTO membergames (member,game,played)",
+		"VALUES(?,?,?)",
+		"ON DUPLICATE KEY UPDATE played=VALUES(played)",
 	}, " "))
 
 	fillXUID = mustPrepare(`INSERT IGNORE INTO membermeta (member_id,meta_key,meta_value) SELECT id,"xuid","0" FROM members`)

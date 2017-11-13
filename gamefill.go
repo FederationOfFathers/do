@@ -30,7 +30,7 @@ var cdnPutKey = os.Getenv("CDN_PUT_KEY")
 
 func init() {
 	handlers[1]["checkGames"] = doCheckGames
-	crontab.AddFunc("@every 120s", cronwrap("queueFillGames", queueFillGames))
+	crontab.AddFunc("@every 8s", cronwrap("queueFillGames", queueFillGames))
 	crontab.AddFunc("@every 3600s", cronwrap("doPopulateMissingGamesMeta", doPopulateMissingGamesMeta))
 }
 
@@ -164,6 +164,10 @@ func doCheckGames(job json.RawMessage) error {
 	var new = 0
 	var added = 0
 
+	if len(apiRes.Titles) < 1 {
+		log.Error("no titles returned for user titlehub-achievement-list", zap.String("username", user.Name), zap.String("xuid", user.XUID))
+	}
+
 	for _, title := range apiRes.Titles {
 		examined++
 		resolved, err := resolveConsole(title, log)
@@ -188,26 +192,35 @@ func doCheckGames(job json.RawMessage) error {
 			log.Error("Unexpected game device", zap.String("title", title.Name), zap.String("id", title.TitleID))
 			continue
 		}
-		res, err := createGame.Exec(resolved, title.TitleID, title.Name)
+		gameID, err := mysqlCreateGame(resolved, title.TitleID, title.Name)
 		if err != nil {
 			log.Error("error creating game", zap.String("title", title.Name), zap.String("id", title.TitleID), zap.Error(err))
 			return err
 		}
-		if id, err := res.LastInsertId(); err != nil && id > 0 {
-			new++
-		}
-		if err := doFillGame(title, resolved); err != nil {
-			log.Error("error filling game info", zap.String("title", title.Name), zap.String("id", title.TitleID), zap.Error(err))
-		}
-
-		res, err = ownGame.Exec(user.ID, resolved, title.TitleID, title.TitleHistory.LastTimePlayed.Time())
+		res, err := ownGame.Exec(user.ID, gameID, title.TitleHistory.LastTimePlayed.Time())
 		if err != nil {
 			log.Info(string(title.TitleHistory.LastTimePlayed), zap.Time("parsed", title.TitleHistory.LastTimePlayed.Time()))
 			log.Error("error owning game", zap.String("title", title.Name), zap.String("id", title.TitleID), zap.Error(err))
 			return err
 		}
 		if id, err := res.LastInsertId(); err != nil && id > 0 {
+			log.Debug(
+				"owning",
+				zap.String("title", title.Name),
+				zap.String("platform_id", title.TitleID),
+				zap.Int("platform", resolved),
+				zap.Int("local_id", gameID),
+				zap.Int64("relationship", id),
+			)
 			added++
+		} else {
+			log.Debug(
+				"updating",
+				zap.String("title", title.Name),
+				zap.String("platform_id", title.TitleID),
+				zap.Int("platform", resolved),
+				zap.Int("local_id", gameID),
+			)
 		}
 	}
 	log.Info("run complete", zap.Int("games-created", new), zap.Int("added", added), zap.Int("examined", examined), zap.Duration("took", time.Now().Sub(start)))
@@ -217,8 +230,8 @@ func doCheckGames(job json.RawMessage) error {
 func queueFillGames(cronID int, name string) {
 	var log = logger.With(zap.String("type", "cron"), zap.Int("id", cronID), zap.String("name", name))
 	var data = memberXboxInfo{}
-	log.Debug("findNeedGameFill", zap.Int64("seen", agoTs(month)), zap.ByteString("_games_last_check", agoBytes(day)))
-	row := findNeedGameFill.QueryRow(agoTs(month), agoBytes(day))
+	log.Debug("findNeedGameFill", zap.Int64("seen", agoTs(month)), zap.ByteString("_games_last_check", agoBytes(time.Hour)))
+	row := findNeedGameFill.QueryRow(agoTs(month), agoBytes(time.Hour))
 	if row == nil {
 		log.Debug("no users need games filled")
 		return
@@ -229,6 +242,10 @@ func queueFillGames(cronID int, name string) {
 		} else {
 			log.Error("error scanning row", zap.Error(err))
 		}
+		return
+	}
+	if _, err := doStmt(setMemberMeta, data.ID, "_games_last_check", timeBuf()); err != nil {
+		log.Error("Error setting _games_last_check", zap.Error(err))
 		return
 	}
 	enqueuev1("checkGames", data)

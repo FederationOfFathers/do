@@ -34,7 +34,11 @@ func initConsumer() {
 		logger.Fatal("Error creating NSQ consumer", zap.Error(err))
 	}
 	nsqC = consumer
-	nsqC.AddHandler(nsq.HandlerFunc(handle))
+	if development {
+		nsqC.AddConcurrentHandlers(nsq.HandlerFunc(handle), 1)
+	} else {
+		nsqC.AddConcurrentHandlers(nsq.HandlerFunc(handle), 5)
+	}
 	if err := nsqC.ConnectToNSQD(nsqAddress); err != nil {
 		logger.Fatal("Error connecting to NSQ", zap.Error(err))
 	}
