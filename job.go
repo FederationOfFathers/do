@@ -36,6 +36,10 @@ func doJob(data []byte) error {
 		if handler, ok := handlers[env.Version][job.Name]; ok {
 			return handler(job.Data)
 		}
+		logger.Debug("no handler for job", zap.ByteString("job", data))
+		if development {
+			return nil
+		}
 		return errNoHandler
 	default:
 		return errUnsupportedVersion

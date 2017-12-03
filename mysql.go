@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"strings"
 	"time"
@@ -24,6 +25,11 @@ var (
 	fillGamesCheck   *sql.Stmt
 	getGameInfo      *sql.Stmt
 	setGameInfo      *sql.Stmt
+	getGameXuidAndID *sql.Stmt
+	putGameCheevo    *sql.Stmt
+	getGameCheevo    *sql.Stmt
+	ownGameCheevo    *sql.Stmt
+	findCheevoFill   *sql.Stmt
 )
 
 func mustPrepare(query string) *sql.Stmt {
@@ -35,6 +41,42 @@ func mustPrepare(query string) *sql.Stmt {
 }
 
 func initQueries() {
+	findCheevoFill = mustPrepare(strings.Join([]string{
+		"SELECT mg.id",
+		"FROM `membergames` mg",
+		"JOIN games g ON ( mg.game = g.id )",
+		"WHERE",
+		"`cheevos` < `played`",
+		"AND `cheevos_checked` < `played`",
+		fmt.Sprintf("AND g.platform IN(%d,%d)", platformXbox360, platformXboxOne),
+		"ORDER BY PLAYED ASC LIMIT 1",
+	}, " "))
+	ownGameCheevo = mustPrepare("INSERT IGNORE INTO member_xbl_cheevos (member,cheevo,unlocked,unlocked_at) VALUES(?,?,1,NOW())")
+	getGameCheevo = mustPrepare(
+		"SELECT id FROM games_xbl_cheevos WHERE game_id = ? AND game_aid = ? LIMIT 1",
+	)
+	putGameCheevo = mustPrepare(strings.Join([]string{
+		"INSERT INTO games_xbl_cheevos",
+		"(game_id,game_aid,name,description,image)",
+		"VALUES",
+		"(?,?,?,?,?)",
+	}, " "))
+
+	getGameXuidAndID = mustPrepare(strings.Join([]string{
+		"SELECT",
+		"  g.platform_id AS titleID,",
+		"  mm.meta_value AS xuid,",
+		"  mg.member as memberID",
+		"FROM",
+		"  membergames mg",
+		"  JOIN games g ON ( mg.game = g.id )",
+		"  JOIN membermeta mm ON ( mg.member = mm.member_id AND mm.meta_key = 'xuid')",
+		"WHERE",
+		"  mg.id = ?",
+		fmt.Sprintf("  AND g.platform IN(%d,%d)", platformXbox360, platformXboxOne),
+		"LIMIT 1",
+	}, " "))
+
 	setMemberMeta = mustPrepare(strings.Join([]string{
 		"INSERT INTO membermeta (member_ID,meta_key,meta_value) VALUES(?,?,?)",
 		"ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value)",

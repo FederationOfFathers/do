@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"flag"
 	"strconv"
 	"time"
 
@@ -17,10 +18,21 @@ type memberXboxInfo struct {
 	LastCheck string `json:"l"`
 }
 
+var doUserFill = false
+
 func init() {
-	handlers[1]["emptyXUID"] = doFillEmptyXUID
-	crontab.AddFunc("@every 60s", cronwrap("queueFillEmptyXUID", queueFillEmptyXUID))
-	crontab.AddFunc("@every 3600s", cronwrap("doPopulateMissingXUIDMeta", doPopulateMissingXUIDMeta))
+	flag.BoolVar(&doUserFill, "users", doUserFill, "Dev -- fill users")
+}
+
+func initUserFill() {
+	if !development || doUserFill {
+		logger.Debug("Doing User Fill")
+		handlers[1]["emptyXUID"] = doFillEmptyXUID
+		crontab.AddFunc("@every 60s", cronwrap("queueFillEmptyXUID", queueFillEmptyXUID))
+		crontab.AddFunc("@every 3600s", cronwrap("doPopulateMissingXUIDMeta", doPopulateMissingXUIDMeta))
+	} else {
+		logger.Debug("Skipping User Fill")
+	}
 }
 
 func doPopulateMissingXUIDMeta(cronID int, name string) {

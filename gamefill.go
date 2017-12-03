@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"net/http"
 	"os"
@@ -27,11 +28,21 @@ const (
 )
 
 var cdnPutKey = os.Getenv("CDN_PUT_KEY")
+var doGameFill = false
 
 func init() {
-	handlers[1]["checkGames"] = doCheckGames
-	crontab.AddFunc("@every 8s", cronwrap("queueFillGames", queueFillGames))
-	crontab.AddFunc("@every 3600s", cronwrap("doPopulateMissingGamesMeta", doPopulateMissingGamesMeta))
+	flag.BoolVar(&doGameFill, "games", doGameFill, "Dev -- fill games")
+}
+
+func initGameFill() {
+	if !development || doGameFill {
+		logger.Debug("Doing Game Filling")
+		handlers[1]["checkGames"] = doCheckGames
+		crontab.AddFunc("@every 8s", cronwrap("queueFillGames", queueFillGames))
+		crontab.AddFunc("@every 3600s", cronwrap("doPopulateMissingGamesMeta", doPopulateMissingGamesMeta))
+	} else {
+		logger.Debug("Skipping Game Filling")
+	}
 }
 
 func doPopulateMissingGamesMeta(cronID int, name string) {
