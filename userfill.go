@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"strconv"
-	"time"
 
 	"go.uber.org/zap"
 )
@@ -47,9 +46,9 @@ func doFillEmptyXUID(job json.RawMessage) error {
 		log.Error("Error unmarshalling", zap.Error(err), zap.ByteString("data", job))
 		return err
 	}
-	timeBuf, _ := time.Now().MarshalJSON()
-	if _, err := setMemberMeta.Exec(user.ID, "_xuid_last_check", timeBuf); err != nil {
-		log.Error("Errorsetting _xuid_last_check", zap.Error(err))
+	log.Info("setMemberMeta", zap.Int("member_id", user.ID), zap.String("meta_key", "_xuid_last_check"), zap.ByteString("timeBuf", timeBuf()))
+	if _, err := setMemberMeta.Exec(user.ID, "_xuid_last_check", timeBuf()); err != nil {
+		log.Error("Error setting _xuid_last_check", zap.Error(err))
 		return err
 	}
 	xuidInt, err := xbl.XUID(user.XBL)
@@ -69,6 +68,7 @@ func doFillEmptyXUID(job json.RawMessage) error {
 func queueFillEmptyXUID(cronID int, name string) {
 	var log = logger.With(zap.String("type", "cron"), zap.Int("id", cronID), zap.String("name", name))
 	var data = memberXboxInfo{}
+	log.Info("checking", zap.Int64("agoTs", agoTs(month)), zap.ByteString("agoBytes", agoBytes(day)))
 	row := findNeedXUID.QueryRow(agoTs(month), agoBytes(day))
 	if row == nil {
 		log.Debug("no users requiring xuid check")
@@ -81,6 +81,10 @@ func queueFillEmptyXUID(cronID int, name string) {
 		} else {
 			log.Error("Error scanning row", zap.Error(err))
 		}
+		return
+	}
+	if _, err := setMemberMeta.Exec(data.ID, "_xuid_last_check", timeBuf()); err != nil {
+		log.Error("Error setting _xuid_last_check", zap.Error(err))
 		return
 	}
 	enqueuev1("emptyXUID", data)

@@ -70,7 +70,7 @@ func doFillCheevos(job json.RawMessage) error {
 	for _, entry := range list {
 		aid, err := cheevo(entry)
 		if err != nil {
-			log.Error("Error fetching cheevo id from db", zap.Error(err))
+			log.Error("Error fetching cheevo id from db", zap.Error(err), zap.String("image", entry.Image))
 			return err
 		}
 		if !entry.Unlocked {
@@ -139,7 +139,7 @@ func cheevo(a *xboxapi.Achievement) (int, error) {
 
 	// Ok, Fine, Insert...
 	cheevoMapLock.Lock()
-	res, err := putGameCheevo.Exec(a.TitleID, a.ID, strings.TrimSpace(a.Name), strings.TrimSpace(a.Description), strings.TrimSpace(a.Image))
+	res, err := putGameCheevo.Exec(a.TitleID, a.ID, strings.TrimSpace(a.Name), strings.TrimSpace(a.Description)) // , strings.TrimSpace(a.Image))
 	cheevoMapLock.Unlock()
 	if err != nil {
 		return 0, err

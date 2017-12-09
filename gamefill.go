@@ -175,63 +175,64 @@ func doCheckGames(job json.RawMessage) error {
 	var new = 0
 	var added = 0
 
-	if len(apiRes.Titles) < 1 {
+	if apiRes == nil || apiRes.Titles == nil || len(apiRes.Titles) < 1 {
 		log.Error("no titles returned for user titlehub-achievement-list", zap.String("username", user.Name), zap.String("xuid", user.XUID))
-	}
+	} else {
 
-	for _, title := range apiRes.Titles {
-		examined++
-		resolved, err := resolveConsole(title, log)
-		if err != nil {
-			log.Error("error resolving", zap.String("id", title.TitleID), zap.Error(err))
-			continue
-		}
-		if resolved == platformUnknown {
-			m := gomail.NewMessage()
-			m.SetHeader("From", "do@fofgaming.com")
-			m.SetHeader("To", "apokalyptik@apokalyptik.com")
-			m.SetHeader("Subject", "Unexpected game device")
-			buf, _ := json.MarshalIndent(map[string]interface{}{
-				"user":  user,
-				"title": title,
-			}, "", "\t")
-			m.SetBody("text/plain", string(buf))
-			d := gomail.Dialer{Host: "localhost", Port: 587}
-			if err := d.DialAndSend(m); err != nil {
-				log.Error("Error sending email notice...")
+		for _, title := range apiRes.Titles {
+			examined++
+			resolved, err := resolveConsole(title, log)
+			if err != nil {
+				log.Error("error resolving", zap.String("id", title.TitleID), zap.Error(err))
+				continue
 			}
-			log.Error("Unexpected game device", zap.String("title", title.Name), zap.String("id", title.TitleID))
-			continue
-		}
-		gameID, err := mysqlCreateGame(resolved, title.TitleID, title.Name)
-		if err != nil {
-			log.Error("error creating game", zap.String("title", title.Name), zap.String("id", title.TitleID), zap.Error(err))
-			return err
-		}
-		res, err := ownGame.Exec(user.ID, gameID, title.TitleHistory.LastTimePlayed.Time())
-		if err != nil {
-			log.Info(string(title.TitleHistory.LastTimePlayed), zap.Time("parsed", title.TitleHistory.LastTimePlayed.Time()))
-			log.Error("error owning game", zap.String("title", title.Name), zap.String("id", title.TitleID), zap.Error(err))
-			return err
-		}
-		if id, err := res.LastInsertId(); err != nil && id > 0 {
-			log.Debug(
-				"owning",
-				zap.String("title", title.Name),
-				zap.String("platform_id", title.TitleID),
-				zap.Int("platform", resolved),
-				zap.Int("local_id", gameID),
-				zap.Int64("relationship", id),
-			)
-			added++
-		} else {
-			log.Debug(
-				"updating",
-				zap.String("title", title.Name),
-				zap.String("platform_id", title.TitleID),
-				zap.Int("platform", resolved),
-				zap.Int("local_id", gameID),
-			)
+			if resolved == platformUnknown {
+				m := gomail.NewMessage()
+				m.SetHeader("From", "do@fofgaming.com")
+				m.SetHeader("To", "apokalyptik@apokalyptik.com")
+				m.SetHeader("Subject", "Unexpected game device")
+				buf, _ := json.MarshalIndent(map[string]interface{}{
+					"user":  user,
+					"title": title,
+				}, "", "\t")
+				m.SetBody("text/plain", string(buf))
+				d := gomail.Dialer{Host: "localhost", Port: 587}
+				if err := d.DialAndSend(m); err != nil {
+					log.Error("Error sending email notice...")
+				}
+				log.Error("Unexpected game device", zap.String("title", title.Name), zap.String("id", title.TitleID))
+				continue
+			}
+			gameID, err := mysqlCreateGame(resolved, title.TitleID, title.Name)
+			if err != nil {
+				log.Error("error creating game", zap.String("title", title.Name), zap.String("id", title.TitleID), zap.Error(err))
+				return err
+			}
+			res, err := ownGame.Exec(user.ID, gameID, title.TitleHistory.LastTimePlayed.Time())
+			if err != nil {
+				log.Info(string(title.TitleHistory.LastTimePlayed), zap.Time("parsed", title.TitleHistory.LastTimePlayed.Time()))
+				log.Error("error owning game", zap.String("title", title.Name), zap.String("id", title.TitleID), zap.Error(err))
+				return err
+			}
+			if id, err := res.LastInsertId(); err != nil && id > 0 {
+				log.Debug(
+					"owning",
+					zap.String("title", title.Name),
+					zap.String("platform_id", title.TitleID),
+					zap.Int("platform", resolved),
+					zap.Int("local_id", gameID),
+					zap.Int64("relationship", id),
+				)
+				added++
+			} else {
+				log.Debug(
+					"updating",
+					zap.String("title", title.Name),
+					zap.String("platform_id", title.TitleID),
+					zap.Int("platform", resolved),
+					zap.Int("local_id", gameID),
+				)
+			}
 		}
 	}
 	log.Info("run complete", zap.Int("games-created", new), zap.Int("added", added), zap.Int("examined", examined), zap.Duration("took", time.Now().Sub(start)))

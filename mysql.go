@@ -57,9 +57,11 @@ func initQueries() {
 	)
 	putGameCheevo = mustPrepare(strings.Join([]string{
 		"INSERT INTO games_xbl_cheevos",
-		"(game_id,game_aid,name,description,image)",
+		// "(game_id,game_aid,name,description,image)",
+		"(game_id,game_aid,name,description)",
 		"VALUES",
-		"(?,?,?,?,?)",
+		// "(?,?,?,?,?)",
+		"(?,?,?,?)",
 	}, " "))
 
 	getGameXuidAndID = mustPrepare(strings.Join([]string{
@@ -103,7 +105,9 @@ func initQueries() {
 		"	xbl NOT IN('','**DISABLED**')",
 		"	AND seen > ?",
 		"	AND mm.meta_value IN('','0')",
-		"	AND ( mmm.meta_value < ? OR mmm.meta_value IN('','0',NULL) )",
+		"	AND ( mmm.meta_value < ? OR mmm.meta_value IS NULL )",
+		"ORDER BY",
+		"	mmm.meta_value DESC",
 		"LIMIT 1",
 	}, " "))
 	findNeedGameFill = mustPrepare(strings.Join([]string{
