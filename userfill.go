@@ -68,7 +68,7 @@ func doFillEmptyXUID(job json.RawMessage) error {
 func queueFillEmptyXUID(cronID int, name string) {
 	var log = logger.With(zap.String("type", "cron"), zap.Int("id", cronID), zap.String("name", name))
 	var data = memberXboxInfo{}
-	log.Info("checking", zap.Int64("agoTs", agoTs(month)), zap.ByteString("agoBytes", agoBytes(day)))
+	log.Debug("findNeedXUID", zap.Int64("agoTs", agoTs(month)), zap.ByteString("agoBytes", agoBytes(day)))
 	row := findNeedXUID.QueryRow(agoTs(month), agoBytes(day))
 	if row == nil {
 		log.Debug("no users requiring xuid check")
