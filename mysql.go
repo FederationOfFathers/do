@@ -58,10 +58,8 @@ func initQueries() {
 	putGameCheevo = mustPrepare(strings.Join([]string{
 		"INSERT INTO games_xbl_cheevos",
 		"(game_id,game_aid,name,description,image)",
-		// "(game_id,game_aid,name,description)",
 		"VALUES",
 		"(?,?,?,?,?)",
-		// "(?,?,?,?)",
 	}, " "))
 
 	getGameXuidAndID = mustPrepare(strings.Join([]string{
