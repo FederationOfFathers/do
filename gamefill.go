@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/FederationOfFathers/xboxapi"
@@ -125,30 +123,14 @@ func doFillGame(title *xboxapi.TilehubTitle, platform int) error {
 	}
 	if gameImage == "" && title.DisplayImage != "" {
 		imageKey := fmt.Sprintf("game-image-%d", gameID)
-		putURL := fmt.Sprintf("http://dashboard.fofgaming.com/api/v0/cdn/%s", imageKey)
-		req, err := http.NewRequest("PUT", putURL, strings.NewReader(title.DisplayImage))
-		if err != nil {
-			log.Error("error forming put request", zap.Error(err))
+		if err := cdnImage(title.DisplayImage, imageKey); err != nil {
+			log.Error("error storing image", zap.Error(err))
 			return err
-		}
-		req.Header.Set("Access-Key", cdnPutKey)
-		rsp, err := http.DefaultClient.Do(req)
-		if rsp != nil && rsp.Body != nil {
-			defer rsp.Body.Close()
-		}
-		if err != nil {
-			log.Error("error fetching", zap.Error(err))
-			return err
-		}
-		if rsp.StatusCode != 200 {
-			log.Error("error fetching", zap.Int("statusCode", rsp.StatusCode), zap.String("status", rsp.Status))
-			return fmt.Errorf(rsp.Status)
 		}
 		if _, err := setGameInfo.Exec(imageKey, gameID); err != nil {
 			log.Error("error updating", zap.Error(err))
 			return err
 		}
-		log.Debug(putURL)
 	}
 	return nil
 }
@@ -176,7 +158,7 @@ func doCheckGames(job json.RawMessage) error {
 	var added = 0
 
 	if apiRes == nil || apiRes.Titles == nil || len(apiRes.Titles) < 1 {
-		log.Error("no titles returned for user titlehub-achievement-list", zap.String("username", user.Name), zap.String("xuid", user.XUID))
+		log.Info("no titles returned for user titlehub-achievement-list", zap.String("username", user.Name), zap.String("xuid", user.XUID))
 	} else {
 
 		for _, title := range apiRes.Titles {
@@ -261,5 +243,5 @@ func queueFillGames(cronID int, name string) {
 		return
 	}
 	enqueuev1("checkGames", data)
-	logger.Info("queued", zap.String("username", data.Name), zap.String("xuid", data.XUID), zap.Int("userid", data.ID))
+	logger.Debug("queued", zap.String("username", data.Name), zap.String("xuid", data.XUID), zap.Int("userid", data.ID))
 }

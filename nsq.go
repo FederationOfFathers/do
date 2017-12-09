@@ -56,7 +56,7 @@ func initProducer() {
 }
 
 func handle(m *nsq.Message) error {
-	logger.Info("Got NSQ Message", zap.Int64("key", m.Timestamp))
+	logger.Debug("Got NSQ Message", zap.Int64("key", m.Timestamp))
 	if err := doJob(m.Body); err != nil {
 		logger.Error("error doing job", zap.ByteString("body", m.Body), zap.Error(err))
 	}

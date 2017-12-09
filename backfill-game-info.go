@@ -119,5 +119,5 @@ func queueFillGameImages(cronID int, name string) {
 		return
 	}
 	enqueuev1("doBackfillGameImage", id)
-	logger.Info("queued", zap.Int("id", id))
+	logger.Debug("queued", zap.Int("id", id))
 }

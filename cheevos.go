@@ -4,10 +4,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"strings"
 	"sync"
 
 	"github.com/FederationOfFathers/xboxapi"
+	"github.com/labstack/gommon/log"
 	"go.uber.org/zap"
 )
 
@@ -61,7 +63,7 @@ func doFillCheevos(job json.RawMessage) error {
 
 	list, err := xbl.Achievements(xuid, int(titleID64))
 	if err != nil {
-		log.Error("unable to get cheevo list", zap.String("xuid", xuid), zap.String("titleID", titleID.String()))
+		log.Error("unable to get cheevo list", zap.Error(err), zap.String("xuid", xuid), zap.String("titleID", titleID.String()))
 		return err
 	}
 
@@ -84,6 +86,7 @@ func doFillCheevos(job json.RawMessage) error {
 	if _, err := db.Exec("UPDATE membergames SET cheevos = NOW() WHERE id = ? limit 1", fillFor); err != nil {
 		log.Error("error updating cheevos", zap.Error(err))
 	}
+	log.Info("Filled cheevos", zap.Int("userID", memberID), zap.Int("gameID", fillFor))
 	return nil
 }
 
@@ -101,7 +104,7 @@ func queueFillCheevos(cronID int, name string) {
 	}
 	log.Debug("found game to fill for", zap.Int("game_id", fillFor))
 	enqueuev1("cheevos", fillFor)
-	log.Info("queued", zap.Int("game_id", fillFor))
+	log.Debug("queued", zap.Int("game_id", fillFor))
 	if _, err := db.Exec("UPDATE membergames SET cheevos_checked = NOW() WHERE id = ? limit 1", fillFor); err != nil {
 		log.Error("error updating cheevos_checked", zap.Error(err))
 	}
@@ -137,9 +140,17 @@ func cheevo(a *xboxapi.Achievement) (int, error) {
 		return 0, err
 	}
 
+	cheevoImage := strings.TrimSpace(a.Image)
+	imageKey := fmt.Sprintf("cheevo-image-%d-%d", a.TitleID, a.ID)
+	if cheevoImage != "" {
+		if err := cdnImage(cheevoImage, imageKey); err != nil {
+			log.Error("error storing image", zap.String("imageKey", imageKey), zap.String("cheevoImage", cheevoImage), zap.Error(err))
+			imageKey = ""
+		}
+	}
 	// Ok, Fine, Insert...
 	cheevoMapLock.Lock()
-	res, err := putGameCheevo.Exec(a.TitleID, a.ID, strings.TrimSpace(a.Name), strings.TrimSpace(a.Description)) // , strings.TrimSpace(a.Image))
+	res, err := putGameCheevo.Exec(a.TitleID, a.ID, strings.TrimSpace(a.Name), strings.TrimSpace(a.Description), imageKey)
 	cheevoMapLock.Unlock()
 	if err != nil {
 		return 0, err

@@ -88,5 +88,5 @@ func queueFillEmptyXUID(cronID int, name string) {
 		return
 	}
 	enqueuev1("emptyXUID", data)
-	log.Info("queued", zap.String("username", data.Name), zap.Int("userid", data.ID))
+	log.Debug("queued", zap.String("username", data.Name), zap.Int("userid", data.ID))
 }
